@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DETRAN Janela">
+  <title>DETRAN Janela</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <div id="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">DJ</div>
+        <div>
+          <strong>DETRAN Janela</strong>
+          <span>Missões rápidas · CEBRASPE</span>
+        </div>
+      </div>
+      <button id="install-btn" class="icon-btn hidden" aria-label="Instalar aplicativo" title="Instalar aplicativo">⇩</button>
+    </header>
+
+    <main>
+      <section id="screen-now" class="screen active" data-screen="now">
+        <div class="countdown-card">
+          <div>
+            <span>PROVA DETRAN-AL</span>
+            <strong id="days-left">—</strong>
+            <small>dias restantes</small>
+          </div>
+          <div class="countdown-meta">
+            <b>20 set 2026</b>
+            <span>Analista de Trânsito · Análise de Sistemas</span>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">MODO JANELA</span>
+            <h1>Quanto tempo você tem?</h1>
+          </div>
+          <button id="refresh-mission" class="text-btn">Trocar missão</button>
+        </div>
+
+        <div id="time-options" class="time-grid" aria-label="Tempo disponível">
+          <button data-minutes="5">5<small>min</small></button>
+          <button data-minutes="10" class="selected">10<small>min</small></button>
+          <button data-minutes="15">15<small>min</small></button>
+          <button data-minutes="20">20<small>min</small></button>
+          <button data-minutes="30">30<small>min</small></button>
+          <button data-minutes="45">45<small>min</small></button>
+        </div>
+
+        <article id="mission-card" class="mission-card" aria-live="polite">
+          <div class="mission-loading">Preparando a melhor missão...</div>
+        </article>
+
+        <div id="pending-session" class="pending-card hidden">
+          <div>
+            <strong>Você abriu uma missão no QConcursos</strong>
+            <span>Registre o resultado para atualizar o próximo foco.</span>
+          </div>
+          <button id="finish-pending" class="btn secondary">Registrar</button>
+        </div>
+
+        <section class="quick-summary">
+          <div><span>Hoje</span><strong id="today-minutes">0 min</strong></div>
+          <div><span>Questões</span><strong id="today-questions">0</strong></div>
+          <div><span>Precisão</span><strong id="overall-accuracy">—</strong></div>
+        </section>
+      </section>
+
+      <section id="screen-plan" class="screen" data-screen="plan">
+        <div class="page-title">
+          <span class="eyebrow">ROTA DO DIA</span>
+          <h1>Plano matador móvel</h1>
+          <p>O plano usa peso do edital, revisões vencidas e seu desempenho registrado no celular.</p>
+        </div>
+        <div class="plan-controls">
+          <label>Tempo disponível hoje
+            <select id="daily-budget">
+              <option value="20">20 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="45">45 minutos</option>
+              <option value="60" selected>60 minutos</option>
+              <option value="90">90 minutos</option>
+              <option value="120">120 minutos</option>
+            </select>
+          </label>
+          <button id="rebuild-plan" class="btn secondary">Recalcular</button>
+        </div>
+        <div id="daily-plan" class="plan-list"></div>
+      </section>
+
+      <section id="screen-syllabus" class="screen" data-screen="syllabus">
+        <div class="page-title">
+          <span class="eyebrow">EDITAL INTELIGENTE</span>
+          <h1>Conteúdo programático</h1>
+          <p>Atualidades fica separada e não entra nas missões objetivas.</p>
+        </div>
+        <div class="search-box">
+          <input id="syllabus-search" type="search" placeholder="Buscar disciplina, assunto ou subassunto...">
+        </div>
+        <div class="filter-row">
+          <button class="filter-chip active" data-filter="all">Todos</button>
+          <button class="filter-chip" data-filter="priority">Alta prioridade</button>
+          <button class="filter-chip" data-filter="weak">Fraquezas</button>
+          <button class="filter-chip" data-filter="review">Revisões</button>
+        </div>
+        <div id="syllabus-list" class="syllabus-list"></div>
+      </section>
+
+      <section id="screen-data" class="screen" data-screen="data">
+        <div class="page-title">
+          <span class="eyebrow">CONTROLE LOCAL</span>
+          <h1>Dados e configuração</h1>
+          <p>Nenhuma credencial do QConcursos é armazenada.</p>
+        </div>
+
+        <div id="stats-panel" class="stats-grid"></div>
+
+        <div class="settings-card">
+          <h2>Preferências</h2>
+          <label>Modo padrão
+            <select id="default-mode">
+              <option value="auto">Automático inteligente</option>
+              <option value="new">Conteúdo novo</option>
+              <option value="review">Revisão e erros</option>
+              <option value="mixed">Misto</option>
+            </select>
+          </label>
+          <label class="toggle-line"><input id="comments-only" type="checkbox" checked><span>Priorizar questões com comentários</span></label>
+          <label class="toggle-line"><input id="exclude-resolved" type="checkbox"><span>Preferir não resolvidas no QConcursos</span></label>
+          <label>Meta diária no celular
+            <select id="daily-goal">
+              <option value="15">15 min</option>
+              <option value="30" selected>30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">60 min</option>
+            </select>
+          </label>
+          <button id="save-settings" class="btn primary full">Salvar preferências</button>
+        </div>
+
+        <div class="settings-card">
+          <h2>Filtros do QConcursos</h2>
+          <p class="muted">O aplicativo já abre uma busca com CEBRASPE, Certo/Errado e exclusão de anuladas/desatualizadas. Para precisão máxima, cole depois o endereço de um filtro salvo do QC em cada assunto.</p>
+          <button id="manage-routes" class="btn secondary full">Gerenciar filtros salvos</button>
+        </div>
+
+        <div class="settings-card">
+          <h2>Backup e futura integração</h2>
+          <p class="muted">O arquivo exportado poderá ser importado no sistema do computador quando fizermos a integração.</p>
+          <div class="button-pair">
+            <button id="export-data" class="btn secondary">Exportar JSON</button>
+            <label class="btn secondary file-label">Importar JSON<input id="import-data" type="file" accept="application/json"></label>
+          </div>
+          <button id="reset-data" class="danger-link">Apagar dados deste celular</button>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      <button class="active" data-target="now"><span>⚡</span>Agora</button>
+      <button data-target="plan"><span>▦</span>Plano</button>
+      <button data-target="syllabus"><span>✓</span>Edital</button>
+      <button data-target="data"><span>◉</span>Dados</button>
+    </nav>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="data/edital.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
