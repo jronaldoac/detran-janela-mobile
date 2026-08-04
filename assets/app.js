@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '0.1.1';
+  const APP_VERSION = '0.1.2';
   const STORAGE_KEY = 'detran_janela_mobile_v1';
   const rawData = window.DETRAN_MOBILE_DATA || { edital: [], config: {} };
   const EXAM_DATE = rawData.config?.provaData || '2026-09-20T13:00:00-03:00';
@@ -268,39 +268,89 @@
     return null;
   }
 
-  function compactQcSearchTerm(topic) {
-    const aliases = [
-      [/conceitos basicos.*confidencialidade.*integridade.*disponibilidade/i, 'confidencialidade integridade disponibilidade'],
-      [/metodos de autenticacao.*oauth.*openid.*jwt/i, 'OAuth OpenID JWT autenticação'],
-      [/ameacas e vulnerabilidades.*injection/i, 'SQL injection XSS CSRF'],
-      [/seguranca de aplicativos web.*owasp/i, 'OWASP segurança aplicações web'],
-      [/prevencao e combate a ataques.*ddos/i, 'DDoS spoofing phishing brute force'],
-      [/criptografia e protecao de dados/i, 'criptografia simétrica assimétrica'],
-      [/assinatura e certificacao digital/i, 'assinatura certificação digital'],
-      [/lei n.?\s*13\.709.*lgpd/i, 'LGPD Lei 13.709'],
-      [/problemas de contagem.*probabilidade/i, 'contagem probabilidade'],
-      [/codigo de transito brasileiro/i, 'Código de Trânsito Brasileiro'],
-      [/resolucoes do conselho nacional de transito/i, 'Resoluções CONTRAN']
+  function keywordCandidates(topic) {
+    const source = normalize(`${topic.subject} ${topic.subtopic} ${topic.label}`);
+    const catalog = [
+      [/governanca corporativa.*cobit.*38500/i, ['COBIT 19 e ISO/IEC 38500']],
+      [/gestao de riscos.*31000.*coso/i, ['ISO 31000 e COSO']],
+      [/gestao de servicos.*itil/i, ['ITIL 4']],
+      [/gestao de projetos.*pmbok.*scrum.*kanban/i, ['PMBOK 7', 'Scrum', 'Kanban']],
+      [/planejamento estrategico.*peti.*pdti/i, ['PETI e PDTI']],
+      [/contratacoes de ti/i, ['Contratações de TI']],
+      [/gestao de processos.*bpmn/i, ['BPMN', 'melhoria contínua']],
+      [/indicadores de desempenho.*kpi.*bsc/i, ['KPI e BSC']],
+      [/ciberseguranca.*27001.*22301.*27002.*nist/i, ['ISO 27001', 'ISO 27002', 'ISO 22301', 'NIST']],
+      [/confidencialidade.*integridade.*disponibilidade/i, ['confidencialidade integridade disponibilidade']],
+      [/autenticacao.*oauth.*openid.*jwt/i, ['OAuth 2.0', 'OpenID Connect', 'JWT']],
+      [/ameacas.*vulnerabilidades.*injection/i, ['SQL Injection', 'XSS', 'CSRF']],
+      [/seguranca de aplicativos web.*owasp/i, ['OWASP']],
+      [/ddos|spoofing|phishing|brute force|port scanning/i, ['DDoS', 'spoofing', 'phishing', 'brute force']],
+      [/criptografia.*transito.*repouso/i, ['criptografia em trânsito e em repouso']],
+      [/criptografia simetrica.*assimetrica/i, ['criptografia simétrica e assimétrica']],
+      [/firewalls.*deteccao.*prevencao.*intrus/i, ['firewall IDS IPS']],
+      [/assinatura.*certificacao digital/i, ['assinatura e certificação digital']],
+      [/13\.709|lgpd/i, ['LGPD']],
+      [/tcp\/ip|familia tcp/i, ['TCP/IP']],
+      [/smi.*snmp.*mib/i, ['SNMP MIB']],
+      [/mpls.*802\.11/i, ['MPLS', '802.11', 'WPA2']],
+      [/routing.*switching/i, ['routing e switching']],
+      [/firewalls.*ids.*ips.*proxies.*nat.*vpn/i, ['firewall IDS IPS', 'NAT VPN']],
+      [/cloud computing.*virtualizacao/i, ['cloud computing virtualização']],
+      [/balanceamento de carga.*fail-over.*replicacao/i, ['balanceamento de carga', 'failover', 'replicação de estado']],
+      [/raid/i, ['RAID']],
+      [/nas.*san/i, ['NAS e SAN']],
+      [/conteinerizacao.*devops/i, ['Docker Kubernetes DevOps']],
+      [/windows server 2025.*redhat/i, ['Windows Server 2025', 'Red Hat Enterprise Linux 9']],
+      [/active directory.*ldap/i, ['Active Directory LDAP']],
+      [/gestao de memoria/i, ['gestão de memória']],
+      [/entrada e saida/i, ['entrada e saída']],
+      [/problemas de contagem.*probabilidade/i, ['contagem e probabilidade']],
+      [/logica sentencial|proposicional/i, ['lógica proposicional']],
+      [/tabelas verdade/i, ['tabela verdade']],
+      [/equivalencias/i, ['equivalências lógicas']],
+      [/falacias/i, ['falácias']],
+      [/media.*moda.*mediana.*desvio/i, ['média moda mediana desvio padrão']],
+      [/compreensao.*interpretacao de textos/i, ['interpretação de textos']],
+      [/tipos.*generos textuais/i, ['tipologia e gêneros textuais']],
+      [/ortografia oficial/i, ['ortografia']],
+      [/coesao textual/i, ['coesão textual']],
+      [/pontuacao/i, ['pontuação']],
+      [/concordancia/i, ['concordância verbal e nominal']],
+      [/regencia/i, ['regência verbal e nominal']],
+      [/crase/i, ['crase']],
+      [/pronomes atonos/i, ['colocação pronominal']],
+      [/reescrita/i, ['reescrita de frases']],
+      [/codigo de transito brasileiro/i, ['Código de Trânsito Brasileiro']],
+      [/resolucoes.*contran/i, ['Resoluções CONTRAN']]
     ];
 
-    const rawSource = `${topic.subtopic || topic.subject}`
+    const matched = catalog.find(([pattern]) => pattern.test(source));
+    if (matched) return matched[1];
+
+    const raw = stripNumber(topic.subtopic || topic.subject || topic.label)
       .replace(/\([^)]*\)/g, ' ')
+      .replace(/\b(conceitos?|noções?|fundamentos?|principais|procedimentos?|aplicações?|disposições gerais|aspectos|métodos|gestão de|governança corporativa de|tecnologias?|arquitetura|administração de)\b/gi, ' ')
+      .replace(/[;:,.]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const normalizedSource = normalize(rawSource);
-    const alias = aliases.find(([pattern]) => pattern.test(normalizedSource));
-    if (alias) return alias[1];
 
-    return rawSource
-      .replace(/^\d+(?:\.\d+)*\s*/, '')
-      .replace(/\b(conceitos?|noções?|fundamentos?|principais|procedimentos?|aplicações?|disposições gerais)\b/gi, ' ')
-      .replace(/[;:]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 90) || topic.label;
+    const chunks = raw.split(/\s+(?:e|ou)\s+/i).map(part => part.trim()).filter(Boolean);
+    const concise = chunks
+      .map(part => part.split(/\s+/).slice(0, 4).join(' '))
+      .filter(Boolean)
+      .slice(0, 2);
+
+    return concise.length ? concise : [topic.label];
   }
 
-  function buildQcQuery(topic) {
+  function compactQcSearchTerm(topic, preferredTerm = '') {
+    if (preferredTerm && String(preferredTerm).trim()) return String(preferredTerm).trim();
+    const candidates = keywordCandidates(topic);
+    const index = Math.abs(Number(state.missionNonce || 0)) % candidates.length;
+    return candidates[index] || topic.label;
+  }
+
+  function buildQcQuery(topic, preferredTerm = '') {
     const route = resolveQcDisciplineRoute(topic);
     const base = route
       ? `https://www.qconcursos.com/questoes-de-concursos/disciplinas/${route}/questoes`
@@ -314,7 +364,7 @@
     params.set('per_page', '20');
     if (state.settings.commentsOnly) params.set('has_professor_commentaries', 'true');
     if (state.settings.excludeResolved) params.set('exclude_resolved', 'true');
-    params.set('q', compactQcSearchTerm(topic));
+    params.set('q', compactQcSearchTerm(topic, preferredTerm || state.routes[topic.id]?.keyword || ''));
 
     return `${base}?${params.toString()}`;
   }
@@ -334,7 +384,8 @@
     const stat = getTopicStat(m.topicId);
     const accuracy = topicAccuracy(stat);
     const modeLabel = ({auto:'Inteligente',new:'Exploração',review:'Revisão',mixed:'Misto'})[m.mode] || 'Inteligente';
-    const routeMapped = Boolean(state.routes[m.topicId]?.url);
+    const routeMapped = Boolean(state.routes[m.topicId]?.url || state.routes[m.topicId]?.keyword);
+    const activeKeyword = compactQcSearchTerm(m.topic, state.routes[m.topicId]?.keyword || '');
     card.innerHTML = `
       <div class="mission-head">
         <div class="mission-badges">
@@ -349,9 +400,10 @@
         <div><span>Seu histórico</span><strong>${accuracy === null ? 'Sem dados' : `${Math.round(accuracy*100)}%`}</strong></div>
         <div><span>Motivo</span><strong>${escapeHtml(m.reasons[0])}</strong></div>
       </div>
+      <div class="mission-keyword"><span>Palavra-chave usada no QC</span><strong>${escapeHtml(activeKeyword)}</strong></div>
       <div class="mission-actions">
         <button id="open-qc" class="btn primary">Abrir no QConcursos</button>
-        <button id="edit-mission-route" class="mission-link-btn" title="Configurar filtro">${routeMapped ? '✓' : '⚙'}</button>
+        <button id="edit-mission-route" class="mission-link-btn" title="Configurar palavra-chave ou filtro">${routeMapped ? '✓' : '⚙'}</button>
       </div>`;
     $('#open-qc').onclick = openMissionInQc;
     $('#edit-mission-route').onclick = () => openRouteEditor(m.topic);
@@ -579,29 +631,43 @@
   }
 
   function openRouteEditor(topic) {
-    const existing = state.routes[topic.id]?.url || '';
-    const fallback = buildQcQuery(topic);
+    const existingRoute = state.routes[topic.id] || {};
+    const existingUrl = existingRoute.url || '';
+    const automaticKeyword = compactQcSearchTerm(topic);
+    const existingKeyword = existingRoute.keyword || automaticKeyword;
     openModal(`
-      <h2 class="modal-title">Filtro do QConcursos</h2>
-      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>O link automático usa a disciplina canônica do QConcursos, CEBRASPE, modalidade Certo/Errado e exclusão de questões anuladas/desatualizadas. Para assuntos muito específicos, você ainda pode salvar um filtro no QC e colar a URL abaixo.</p>
+      <h2 class="modal-title">Busca no QConcursos</h2>
+      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>A busca automática agora usa somente uma palavra-chave curta. Você pode ajustá-la sem precisar salvar uma URL completa.</p>
       <div class="route-editor">
-        <label class="form-field">URL do filtro salvo<input id="route-url" type="url" placeholder="https://www.qconcursos.com/..." value="${escapeHtml(existing)}"></label>
-        <button id="test-fallback" class="btn secondary full" style="margin-top:10px">Testar busca automática</button>
+        <label class="form-field">Palavra-chave<input id="route-keyword" type="text" maxlength="80" placeholder="Ex.: COBIT 19 e ISO/IEC 38500" value="${escapeHtml(existingKeyword)}"></label>
+        <small class="route-help">Evite copiar o título inteiro do edital. Use somente a norma, tecnologia ou conceito principal.</small>
+        <label class="form-field" style="margin-top:12px">URL de filtro salvo (opcional)<input id="route-url" type="url" placeholder="https://www.qconcursos.com/..." value="${escapeHtml(existingUrl)}"></label>
+        <button id="test-fallback" class="btn secondary full" style="margin-top:10px">Testar esta palavra-chave</button>
       </div>
       <div class="modal-actions">
-        <button id="clear-route" class="btn secondary">Usar automático</button>
-        <button id="save-route" class="btn primary">Salvar filtro</button>
+        <button id="clear-route" class="btn secondary">Restaurar automático</button>
+        <button id="save-route" class="btn primary">Salvar</button>
       </div>`);
-    $('#test-fallback').onclick = () => window.open(fallback,'_blank','noopener');
+
+    $('#test-fallback').onclick = () => {
+      const keyword = $('#route-keyword').value.trim();
+      window.open(buildQcQuery(topic, keyword), '_blank', 'noopener');
+    };
     $('#clear-route').onclick = () => {
-      delete state.routes[topic.id]; saveState(); closeModal(); renderMission(); toast('Busca automática restaurada.');
+      delete state.routes[topic.id];
+      saveState(); closeModal(); renderMission(); toast('Palavra-chave automática restaurada.');
     };
     $('#save-route').onclick = () => {
       const url = $('#route-url').value.trim();
+      const keyword = $('#route-keyword').value.trim();
       if (url && !/^https:\/\/(www\.)?qconcursos\.com\//i.test(url)) return toast('Cole uma URL válida do QConcursos.');
-      if (url) state.routes[topic.id] = { url, label: topic.label, savedAt: nowIso() };
-      else delete state.routes[topic.id];
-      saveState(); closeModal(); renderMission(); toast('Filtro salvo neste celular.');
+      const customKeyword = keyword && keyword !== automaticKeyword ? keyword : '';
+      if (url || customKeyword) {
+        state.routes[topic.id] = { url, keyword: customKeyword, label: topic.label, savedAt: nowIso() };
+      } else {
+        delete state.routes[topic.id];
+      }
+      saveState(); closeModal(); renderMission(); toast('Busca salva neste celular.');
     };
   }
 
@@ -610,7 +676,7 @@
     openModal(`
       <h2 class="modal-title">Filtros salvos</h2>
       <p class="modal-subtitle">${routes.length ? `${routes.length} rota(s) personalizada(s).` : 'Nenhum filtro personalizado ainda. Use a engrenagem na missão para cadastrar.'}</p>
-      <div class="route-list">${routes.map(([id,route]) => `<div class="route-row"><strong>${escapeHtml(route.label || id)}</strong><span>${escapeHtml(route.url)}</span><button class="btn secondary small" data-remove-route="${id}">Remover</button></div>`).join('') || '<div class="mission-loading">As buscas automáticas continuarão funcionando.</div>'}</div>`);
+      <div class="route-list">${routes.map(([id,route]) => `<div class="route-row"><strong>${escapeHtml(route.label || id)}</strong><span>${escapeHtml(route.keyword || route.url || 'Filtro automático')}</span><button class="btn secondary small" data-remove-route="${id}">Remover</button></div>`).join('') || '<div class="mission-loading">As buscas automáticas continuarão funcionando.</div>'}</div>`);
     $$('[data-remove-route]').forEach(button => button.onclick = () => {
       delete state.routes[button.dataset.removeRoute]; saveState(); openRoutesManager();
     });

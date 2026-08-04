@@ -1,0 +1,7 @@
+Substitua no GitHub mantendo os caminhos:
+- index.html
+- service-worker.js
+- assets/app.js
+- assets/app.css
+
+Depois aguarde o Pages publicar, feche o aplicativo instalado e abra novamente.
