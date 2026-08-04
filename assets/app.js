@@ -1,13 +1,38 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '0.1.0';
+  const APP_VERSION = '0.1.1';
   const STORAGE_KEY = 'detran_janela_mobile_v1';
   const rawData = window.DETRAN_MOBILE_DATA || { edital: [], config: {} };
   const EXAM_DATE = rawData.config?.provaData || '2026-09-20T13:00:00-03:00';
   const SPECIFIC_BLOCKS = new Set(['LEGISLAÇÃO DE TRÂNSITO','SEGURANÇA DA INFORMAÇÃO','INFRAESTRUTURA EM TI','SISTEMAS OPERACIONAIS','GOVERNANÇA DE TI']);
   const TI_BLOCKS = new Set(['TECNOLOGIA DA INFORMAÇÃO','SEGURANÇA DA INFORMAÇÃO','INFRAESTRUTURA EM TI','SISTEMAS OPERACIONAIS','GOVERNANÇA DE TI']);
   const timeQuestionMap = { 5: 3, 10: 5, 15: 8, 20: 10, 30: 15, 45: 20 };
+
+
+  /**
+   * Rotas canônicas do QConcursos.
+   * Evitamos IDs numéricos de disciplina porque eles são internos e podem
+   * apontar para outra matéria quando usados incorretamente.
+   */
+  const QC_DISCIPLINE_ROUTES = Object.freeze({
+    'LÍNGUA PORTUGUESA': 'letras-portugues',
+    'RACIOCÍNIO LÓGICO E ANALÍTICO': 'matematica-raciocinio-logico',
+    'NOÇÕES DE DIREITO CONSTITUCIONAL': 'direito-direito-constitucional',
+    'NOÇÕES DE DIREITO ADMINISTRATIVO': 'direito-direito-administrativo',
+    'NOÇÕES DE DIREITO CIVIL': 'direito-direito-civil',
+    'LEGISLAÇÃO DE TRÂNSITO': 'direito-legislacao-de-transito',
+    'SEGURANÇA DA INFORMAÇÃO': 'tecnologia-da-informacao-seguranca-da-informacao',
+    'SISTEMAS OPERACIONAIS': 'tecnologia-da-informacao-sistemas-operacionais',
+    'GOVERNANÇA DE TI': 'tecnologia-da-informacao-governanca-de-ti'
+  });
+
+  const QC_SPECIALIZED_ROUTES = Object.freeze({
+    networks: 'tecnologia-da-informacao-redes-de-computadores',
+    security: 'tecnologia-da-informacao-seguranca-da-informacao',
+    operatingSystems: 'tecnologia-da-informacao-sistemas-operacionais',
+    basicComputing: 'tecnologia-da-informacao-nocoes-de-informatica'
+  });
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -218,24 +243,80 @@
     return mission;
   }
 
+  function resolveQcDisciplineRoute(topic) {
+    const direct = QC_DISCIPLINE_ROUTES[topic.block];
+    if (direct) return direct;
+
+    const source = normalize(`${topic.block} ${topic.subject} ${topic.subtopic}`);
+
+    if (topic.block === 'TECNOLOGIA DA INFORMAÇÃO') {
+      return QC_SPECIALIZED_ROUTES.basicComputing;
+    }
+
+    if (topic.block === 'INFRAESTRUTURA EM TI') {
+      if (/rede|tcp|ip\b|snmp|mib|mpls|routing|switching|802\.11|vpn|nat|dns/.test(source)) {
+        return QC_SPECIALIZED_ROUTES.networks;
+      }
+      if (/seguranca|criptograf|firewall|ids|ips|spoof|phishing|malware|ddos|dos\b/.test(source)) {
+        return QC_SPECIALIZED_ROUTES.security;
+      }
+      if (/sistema operacional|processo|memoria|entrada e saida/.test(source)) {
+        return QC_SPECIALIZED_ROUTES.operatingSystems;
+      }
+    }
+
+    return null;
+  }
+
+  function compactQcSearchTerm(topic) {
+    const aliases = [
+      [/conceitos basicos.*confidencialidade.*integridade.*disponibilidade/i, 'confidencialidade integridade disponibilidade'],
+      [/metodos de autenticacao.*oauth.*openid.*jwt/i, 'OAuth OpenID JWT autenticação'],
+      [/ameacas e vulnerabilidades.*injection/i, 'SQL injection XSS CSRF'],
+      [/seguranca de aplicativos web.*owasp/i, 'OWASP segurança aplicações web'],
+      [/prevencao e combate a ataques.*ddos/i, 'DDoS spoofing phishing brute force'],
+      [/criptografia e protecao de dados/i, 'criptografia simétrica assimétrica'],
+      [/assinatura e certificacao digital/i, 'assinatura certificação digital'],
+      [/lei n.?\s*13\.709.*lgpd/i, 'LGPD Lei 13.709'],
+      [/problemas de contagem.*probabilidade/i, 'contagem probabilidade'],
+      [/codigo de transito brasileiro/i, 'Código de Trânsito Brasileiro'],
+      [/resolucoes do conselho nacional de transito/i, 'Resoluções CONTRAN']
+    ];
+
+    const rawSource = `${topic.subtopic || topic.subject}`
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const normalizedSource = normalize(rawSource);
+    const alias = aliases.find(([pattern]) => pattern.test(normalizedSource));
+    if (alias) return alias[1];
+
+    return rawSource
+      .replace(/^\d+(?:\.\d+)*\s*/, '')
+      .replace(/\b(conceitos?|noções?|fundamentos?|principais|procedimentos?|aplicações?|disposições gerais)\b/gi, ' ')
+      .replace(/[;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 90) || topic.label;
+  }
+
   function buildQcQuery(topic) {
+    const route = resolveQcDisciplineRoute(topic);
+    const base = route
+      ? `https://www.qconcursos.com/questoes-de-concursos/disciplinas/${route}/questoes`
+      : 'https://www.qconcursos.com/questoes-de-concursos/questoes';
+
     const params = new URLSearchParams();
     params.append('examining_board_ids[]', '2');
     params.append('modality_ids[]', '2');
     params.set('exclude_nullified', 'true');
     params.set('exclude_outdated', 'true');
     params.set('per_page', '20');
-    if (state.settings.commentsOnly) params.set('has_commentaries', 'true');
-    if (TI_BLOCKS.has(topic.block)) params.append('discipline_ids[]', '2');
+    if (state.settings.commentsOnly) params.set('has_professor_commentaries', 'true');
+    if (state.settings.excludeResolved) params.set('exclude_resolved', 'true');
+    params.set('q', compactQcSearchTerm(topic));
 
-    const raw = `${topic.subtopic || topic.subject}`
-      .replace(/\([^)]*\)/g, ' ')
-      .replace(/\b(conceitos?|noções?|fundamentos?|principais|procedimentos?|aplicações?|disposições gerais)\b/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const tokens = raw.split(/[;,:]/).map(s => s.trim()).filter(Boolean);
-    params.set('q', (tokens[0] || topic.label).slice(0, 90));
-    return `https://www.qconcursos.com/questoes-de-concursos/questoes?${params.toString()}`;
+    return `${base}?${params.toString()}`;
   }
 
   function missionUrl(mission) {
@@ -502,7 +583,7 @@
     const fallback = buildQcQuery(topic);
     openModal(`
       <h2 class="modal-title">Filtro do QConcursos</h2>
-      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>O link automático já inclui CEBRASPE, Certo/Errado e exclusão de questões anuladas/desatualizadas. Para maior precisão, salve um filtro no QC e cole a URL abaixo.</p>
+      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>O link automático usa a disciplina canônica do QConcursos, CEBRASPE, modalidade Certo/Errado e exclusão de questões anuladas/desatualizadas. Para assuntos muito específicos, você ainda pode salvar um filtro no QC e colar a URL abaixo.</p>
       <div class="route-editor">
         <label class="form-field">URL do filtro salvo<input id="route-url" type="url" placeholder="https://www.qconcursos.com/..." value="${escapeHtml(existing)}"></label>
         <button id="test-fallback" class="btn secondary full" style="margin-top:10px">Testar busca automática</button>
