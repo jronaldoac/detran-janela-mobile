@@ -98,6 +98,47 @@
         <div id="daily-plan" class="plan-list"></div>
       </section>
 
+      <section id="screen-mix" class="screen" data-screen="mix">
+        <div class="page-title">
+          <span class="eyebrow">SESSÃO PERSONALIZADA</span>
+          <h1>Misturar conteúdos</h1>
+          <p>Escolha várias disciplinas ou assuntos. O aplicativo monta uma fila equilibrada com filtros catalogados do QConcursos.</p>
+        </div>
+
+        <div id="mix-runner" class="mix-runner hidden"></div>
+
+        <div id="mix-builder">
+          <div class="mix-controls-card">
+            <label>Quantidade total
+              <select id="mix-question-count">
+                <option value="10">10 questões</option>
+                <option value="20" selected>20 questões</option>
+                <option value="30">30 questões</option>
+                <option value="40">40 questões</option>
+                <option value="60">60 questões</option>
+              </select>
+            </label>
+            <label>Distribuição
+              <select id="mix-strategy">
+                <option value="balanced" selected>Equilibrada entre os assuntos</option>
+                <option value="priority">Mais peso para conhecimentos específicos</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="mix-selection-summary">
+            <div><span>Selecionados</span><strong id="mix-selected-count">0</strong></div>
+            <button id="mix-clear" class="text-btn">Limpar</button>
+          </div>
+
+          <div class="search-box">
+            <input id="mix-search" type="search" placeholder="Buscar COBIT, LGPD, crase, TCP/IP...">
+          </div>
+          <div id="mix-catalog" class="mix-catalog"></div>
+          <button id="start-mix" class="btn primary full mix-start" disabled>Montar sessão misturada</button>
+        </div>
+      </section>
+
       <section id="screen-syllabus" class="screen" data-screen="syllabus">
         <div class="page-title">
           <span class="eyebrow">EDITAL INTELIGENTE</span>
@@ -135,7 +176,7 @@
               <option value="mixed">Misto</option>
             </select>
           </label>
-          <label class="toggle-line"><input id="comments-only" type="checkbox" checked><span>Priorizar questões com comentários</span></label>
+          <label class="toggle-line"><input id="comments-only" type="checkbox"><span>Somente questões com comentários (pode reduzir resultados)</span></label>
           <label class="toggle-line"><input id="exclude-resolved" type="checkbox"><span>Preferir não resolvidas no QConcursos</span></label>
           <label>Meta diária no celular
             <select id="daily-goal">
@@ -149,9 +190,9 @@
         </div>
 
         <div class="settings-card">
-          <h2>Filtros do QConcursos</h2>
-          <p class="muted">O aplicativo já abre uma busca com CEBRASPE, Certo/Errado e exclusão de anuladas/desatualizadas. Para precisão máxima, cole depois o endereço de um filtro salvo do QC em cada assunto.</p>
-          <button id="manage-routes" class="btn secondary full">Gerenciar filtros salvos</button>
+          <h2>Catálogo QConcursos</h2>
+          <p class="muted">O aplicativo possui rotas catalogadas por assunto do edital. Filtros personalizados continuam disponíveis apenas como substituição opcional.</p>
+          <button id="manage-routes" class="btn secondary full">Gerenciar substituições manuais</button>
         </div>
 
         <div class="settings-card">
@@ -169,6 +210,7 @@
     <nav class="bottom-nav" aria-label="Navegação principal">
       <button class="active" data-target="now"><span>⚡</span>Agora</button>
       <button data-target="plan"><span>▦</span>Plano</button>
+      <button data-target="mix"><span>☷</span>Misturar</button>
       <button data-target="syllabus"><span>✓</span>Edital</button>
       <button data-target="data"><span>◉</span>Dados</button>
     </nav>
@@ -184,7 +226,8 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="data/edital.js?v=0.1.2"></script>
-  <script src="assets/app.js?v=0.1.2"></script>
+  <script src="data/edital.js?v=0.2.0"></script>
+  <script src="data/qc-catalog.js?v=0.2.0"></script>
+  <script src="assets/app.js?v=0.2.0"></script>
 </body>
 </html>

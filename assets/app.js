@@ -1,9 +1,10 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '0.1.2';
+  const APP_VERSION = '0.2.0';
   const STORAGE_KEY = 'detran_janela_mobile_v1';
   const rawData = window.DETRAN_MOBILE_DATA || { edital: [], config: {} };
+  const qcCatalog = Array.isArray(window.QC_ROUTE_CATALOG) ? window.QC_ROUTE_CATALOG : [];
   const EXAM_DATE = rawData.config?.provaData || '2026-09-20T13:00:00-03:00';
   const SPECIFIC_BLOCKS = new Set(['LEGISLAÇÃO DE TRÂNSITO','SEGURANÇA DA INFORMAÇÃO','INFRAESTRUTURA EM TI','SISTEMAS OPERACIONAIS','GOVERNANÇA DE TI']);
   const TI_BLOCKS = new Set(['TECNOLOGIA DA INFORMAÇÃO','SEGURANÇA DA INFORMAÇÃO','INFRAESTRUTURA EM TI','SISTEMAS OPERACIONAIS','GOVERNANÇA DE TI']);
@@ -61,13 +62,14 @@
         dailyBudget: 60,
         dailyGoal: 30,
         defaultMode: 'auto',
-        commentsOnly: true,
+        commentsOnly: false,
         excludeResolved: false
       },
       topicStats: {},
       sessions: [],
       routes: {},
       pendingSession: null,
+      mix: { selected: [], session: null },
       currentMissionId: null,
       missionNonce: 0
     };
@@ -78,13 +80,16 @@
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       if (!parsed || typeof parsed !== 'object') return defaultState();
       const base = defaultState();
+      const migratedSettings = { ...base.settings, ...(parsed.settings || {}) };
+      if (!parsed.appVersion || String(parsed.appVersion).startsWith('0.1.')) migratedSettings.commentsOnly = false;
       return {
         ...base,
         ...parsed,
-        settings: { ...base.settings, ...(parsed.settings || {}) },
+        settings: migratedSettings,
         topicStats: parsed.topicStats || {},
         sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-        routes: parsed.routes || {}
+        routes: parsed.routes || {},
+        mix: { ...base.mix, ...(parsed.mix || {}), selected: Array.isArray(parsed.mix?.selected) ? parsed.mix.selected : [] }
       };
     } catch (error) {
       console.warn('[DETRAN JANELA] Estado inválido:', error);
@@ -268,6 +273,72 @@
     return null;
   }
 
+
+  function wordTokens(value) {
+    const stop = new Set(['de','da','do','das','dos','e','em','para','com','no','na','nos','nas','a','o','as','os','ti','gestao','conceitos','nocoes','fundamentos','principais']);
+    return normalize(value).match(/[a-z0-9]{2,}/g)?.filter(token => !stop.has(token)) || [];
+  }
+
+  function catalogScoreForTopic(entry, topic) {
+    if (!entry || !topic || entry.block !== topic.block) return -999;
+    const topicTokens = new Set(wordTokens(`${topic.subject} ${topic.subtopic} ${topic.label}`));
+    const entryTokens = wordTokens(`${entry.label} ${(entry.aliases || []).join(' ')}`);
+    let score = 0;
+    entryTokens.forEach(token => {
+      if (topicTokens.has(token)) score += token.length >= 5 ? 5 : 3;
+    });
+    const source = normalize(`${topic.subject} ${topic.subtopic} ${topic.label}`);
+    if (source.includes(normalize(entry.label))) score += 18;
+    (entry.aliases || []).forEach(alias => { if (source.includes(normalize(alias))) score += 10; });
+    if (entry.quality === 'exact') score += 1;
+    return score;
+  }
+
+  function catalogEntriesForTopic(topic) {
+    return qcCatalog
+      .map(entry => ({ entry, score: catalogScoreForTopic(entry, topic) }))
+      .filter(row => row.score > 0)
+      .sort((a,b) => b.score - a.score)
+      .map(row => row.entry);
+  }
+
+  function catalogEntryForTopic(topic) {
+    const matches = catalogEntriesForTopic(topic);
+    if (!matches.length) return null;
+    const topScore = catalogScoreForTopic(matches[0], topic);
+    const tied = matches.filter(entry => catalogScoreForTopic(entry, topic) >= topScore - 2).slice(0, 4);
+    return tied[Math.abs(Number(state.missionNonce || 0)) % tied.length] || matches[0];
+  }
+
+  function buildCatalogUrl(entry, mode = 'strict') {
+    if (!entry?.url) return '';
+    const url = new URL(entry.url);
+    if (mode === 'strict') {
+      url.searchParams.append('examining_board_ids[]', '2');
+      url.searchParams.append('modality_ids[]', '2');
+    }
+    url.searchParams.set('exclude_nullified', 'true');
+    url.searchParams.set('exclude_outdated', 'true');
+    url.searchParams.set('per_page', '20');
+    if (mode === 'strict' && state.settings.commentsOnly) url.searchParams.set('has_professor_commentaries', 'true');
+    if (state.settings.excludeResolved) url.searchParams.set('exclude_resolved', 'true');
+    if (entry.query) url.searchParams.set('q', entry.query);
+    return url.toString();
+  }
+
+  function matchTopicForCatalog(entry) {
+    const candidates = topics
+      .filter(topic => topic.objective && topic.block === entry.block)
+      .map(topic => ({ topic, score: catalogScoreForTopic(entry, topic) }))
+      .sort((a,b) => b.score - a.score);
+    return candidates[0]?.topic || topics.find(topic => topic.objective && topic.block === entry.block) || null;
+  }
+
+  function routeQualityLabel(entry) {
+    if (!entry) return 'Busca assistida';
+    return entry.quality === 'exact' ? 'Assunto catalogado' : 'Busca assistida curta';
+  }
+
   function keywordCandidates(topic) {
     const source = normalize(`${topic.subject} ${topic.subtopic} ${topic.label}`);
     const catalog = [
@@ -351,6 +422,9 @@
   }
 
   function buildQcQuery(topic, preferredTerm = '') {
+    const catalogEntry = catalogEntryForTopic(topic);
+    if (catalogEntry && !preferredTerm) return buildCatalogUrl(catalogEntry);
+
     const route = resolveQcDisciplineRoute(topic);
     const base = route
       ? `https://www.qconcursos.com/questoes-de-concursos/disciplinas/${route}/questoes`
@@ -365,12 +439,14 @@
     if (state.settings.commentsOnly) params.set('has_professor_commentaries', 'true');
     if (state.settings.excludeResolved) params.set('exclude_resolved', 'true');
     params.set('q', compactQcSearchTerm(topic, preferredTerm || state.routes[topic.id]?.keyword || ''));
-
     return `${base}?${params.toString()}`;
   }
 
   function missionUrl(mission) {
-    return state.routes[mission.topicId]?.url || buildQcQuery(mission.topic);
+    const custom = state.routes[mission.topicId]?.url;
+    if (custom) return custom;
+    const entry = catalogEntryForTopic(mission.topic);
+    return entry ? buildCatalogUrl(entry) : buildQcQuery(mission.topic);
   }
 
   function renderMission() {
@@ -384,8 +460,9 @@
     const stat = getTopicStat(m.topicId);
     const accuracy = topicAccuracy(stat);
     const modeLabel = ({auto:'Inteligente',new:'Exploração',review:'Revisão',mixed:'Misto'})[m.mode] || 'Inteligente';
-    const routeMapped = Boolean(state.routes[m.topicId]?.url || state.routes[m.topicId]?.keyword);
-    const activeKeyword = compactQcSearchTerm(m.topic, state.routes[m.topicId]?.keyword || '');
+    const entry = catalogEntryForTopic(m.topic);
+    const routeMapped = Boolean(state.routes[m.topicId]?.url);
+    const filterLabel = entry?.label || compactQcSearchTerm(m.topic, state.routes[m.topicId]?.keyword || '');
     card.innerHTML = `
       <div class="mission-head">
         <div class="mission-badges">
@@ -400,12 +477,14 @@
         <div><span>Seu histórico</span><strong>${accuracy === null ? 'Sem dados' : `${Math.round(accuracy*100)}%`}</strong></div>
         <div><span>Motivo</span><strong>${escapeHtml(m.reasons[0])}</strong></div>
       </div>
-      <div class="mission-keyword"><span>Palavra-chave usada no QC</span><strong>${escapeHtml(activeKeyword)}</strong></div>
+      <div class="mission-keyword catalog-route"><span>${escapeHtml(routeQualityLabel(entry))}</span><strong>${escapeHtml(filterLabel)}</strong>${entry?.quality === 'assisted' ? '<small>Se a busca vier ampla, use o modo Misturar com um assunto mais específico.</small>' : ''}</div>
       <div class="mission-actions">
-        <button id="open-qc" class="btn primary">Abrir no QConcursos</button>
-        <button id="edit-mission-route" class="mission-link-btn" title="Configurar palavra-chave ou filtro">${routeMapped ? '✓' : '⚙'}</button>
-      </div>`;
+        <button id="open-qc" class="btn primary">Abrir CEBRASPE</button>
+        <button id="edit-mission-route" class="mission-link-btn" title="Substituição manual opcional">${routeMapped ? '✓' : '⚙'}</button>
+      </div>
+      ${entry ? '<button id="open-qc-broad" class="mission-broad-link">Poucas ou zero questões? Abrir este assunto sem restringir a banca</button>' : ''}`;
     $('#open-qc').onclick = openMissionInQc;
+    if ($('#open-qc-broad')) $('#open-qc-broad').onclick = () => window.open(buildCatalogUrl(entry, 'broad'), '_blank', 'noopener');
     $('#edit-mission-route').onclick = () => openRouteEditor(m.topic);
   }
 
@@ -630,17 +709,222 @@
     $('#days-left').textContent = String(days);
   }
 
+
+  function selectedMixEntries() {
+    const selected = new Set(state.mix?.selected || []);
+    return qcCatalog.filter(entry => selected.has(entry.id));
+  }
+
+  function toggleMixSelection(id, checked) {
+    const selected = new Set(state.mix?.selected || []);
+    checked ? selected.add(id) : selected.delete(id);
+    state.mix = { ...(state.mix || {}), selected: [...selected] };
+    saveState();
+    renderMix();
+  }
+
+  function renderMixCatalog() {
+    const container = $('#mix-catalog');
+    if (!container) return;
+    const search = normalize($('#mix-search')?.value || '');
+    const selected = new Set(state.mix?.selected || []);
+    const filtered = qcCatalog.filter(entry => !search || normalize(`${entry.block} ${entry.label} ${(entry.aliases || []).join(' ')}`).includes(search));
+    const groups = new Map();
+    filtered.forEach(entry => {
+      if (!groups.has(entry.block)) groups.set(entry.block, []);
+      groups.get(entry.block).push(entry);
+    });
+    container.innerHTML = [...groups.entries()].map(([block, entries]) => {
+      const allSelected = entries.length && entries.every(entry => selected.has(entry.id));
+      return `<details class="mix-block" ${search ? 'open' : ''}>
+        <summary><div><strong>${escapeHtml(block)}</strong><span>${entries.length} filtros catalogados</span></div><label class="mix-block-check"><input type="checkbox" data-mix-block="${escapeHtml(block)}" ${allSelected ? 'checked' : ''}><span>todos</span></label></summary>
+        <div class="mix-topic-list">${entries.map(entry => `<label class="mix-topic ${selected.has(entry.id) ? 'selected' : ''}"><input type="checkbox" data-mix-id="${entry.id}" ${selected.has(entry.id) ? 'checked' : ''}><div><strong>${escapeHtml(entry.label)}</strong><span>${entry.quality === 'exact' ? 'rota exata' : 'busca curta catalogada'}</span></div></label>`).join('')}</div>
+      </details>`;
+    }).join('') || '<div class="mission-loading">Nenhum assunto encontrado.</div>';
+
+    $$('[data-mix-id]', container).forEach(input => input.onchange = () => toggleMixSelection(input.dataset.mixId, input.checked));
+    $$('[data-mix-block]', container).forEach(input => input.onchange = () => {
+      const blockEntries = qcCatalog.filter(entry => entry.block === input.dataset.mixBlock && (!search || normalize(`${entry.block} ${entry.label} ${(entry.aliases || []).join(' ')}`).includes(search)));
+      const set = new Set(state.mix?.selected || []);
+      blockEntries.forEach(entry => input.checked ? set.add(entry.id) : set.delete(entry.id));
+      state.mix.selected = [...set]; saveState(); renderMix();
+    });
+  }
+
+  function allocateMixQuestions(entries, total, strategy) {
+    if (!entries.length) return [];
+    const weights = entries.map(entry => strategy === 'priority' && SPECIFIC_BLOCKS.has(entry.block) ? 1.6 : 1);
+    const sum = weights.reduce((a,b)=>a+b,0);
+    let allocated = 0;
+    const segments = entries.map((entry, index) => {
+      const raw = index === entries.length - 1 ? total - allocated : Math.max(1, Math.floor(total * weights[index] / sum));
+      allocated += raw;
+      return { id: uid(), entryId: entry.id, expected: raw, status: 'pending', openedAt: null, result: null };
+    });
+    while (allocated > total) {
+      const candidate = segments.find(segment => segment.expected > 1);
+      if (!candidate) break;
+      candidate.expected -= 1; allocated -= 1;
+    }
+    while (allocated < total) {
+      segments[allocated % segments.length].expected += 1; allocated += 1;
+    }
+    return segments;
+  }
+
+  function startMixSession() {
+    const entries = selectedMixEntries();
+    if (entries.length < 2) return toast('Selecione pelo menos dois assuntos para misturar.');
+    const total = Number($('#mix-question-count').value || 20);
+    if (entries.length > total) return toast('A quantidade total deve ser igual ou maior que o número de assuntos selecionados.');
+    const strategy = $('#mix-strategy').value || 'balanced';
+    state.mix.session = {
+      id: uid(), createdAt: nowIso(), total, strategy, current: 0,
+      segments: allocateMixQuestions(entries, total, strategy)
+    };
+    saveState(); renderMix();
+  }
+
+  function currentMixSegment() {
+    const session = state.mix?.session;
+    return session?.segments?.[session.current] || null;
+  }
+
+  function openCurrentMixSegment() {
+    const segment = currentMixSegment();
+    const entry = qcCatalog.find(item => item.id === segment?.entryId);
+    if (!segment || !entry) return;
+    segment.openedAt = segment.openedAt || nowIso();
+    segment.status = 'opened';
+    saveState(); renderMix();
+    window.open(buildCatalogUrl(entry), '_blank', 'noopener');
+  }
+
+  function openMixResultForm() {
+    const session = state.mix?.session;
+    const segment = currentMixSegment();
+    const entry = qcCatalog.find(item => item.id === segment?.entryId);
+    if (!session || !segment || !entry) return;
+    openModal(`
+      <h2 class="modal-title">Registrar bloco misturado</h2>
+      <p class="modal-subtitle"><strong>${escapeHtml(entry.label)}</strong><br>Bloco ${session.current + 1} de ${session.segments.length}.</p>
+      <div class="form-grid">
+        <label class="form-field">Resolvidas<input id="mix-total" type="number" min="0" max="500" value="${segment.expected}"></label>
+        <label class="form-field">Acertos<input id="mix-correct" type="number" min="0" max="500" value="0"></label>
+        <label class="form-field">Erros<input id="mix-wrong" type="number" min="0" max="500" value="0"></label>
+        <label class="form-field">Brancos<input id="mix-blank" type="number" min="0" max="500" value="0"></label>
+        <label class="form-field">Minutos<input id="mix-minutes" type="number" min="1" max="300" value="${Math.max(5, Math.round(segment.expected * 1.5))}"></label>
+      </div>
+      <div class="modal-actions"><button class="btn secondary" data-close-modal>Depois</button><button id="save-mix-result" class="btn primary">Salvar e avançar</button></div>`);
+    $('#save-mix-result').onclick = saveMixResult;
+  }
+
+  function saveMixResult() {
+    const session = state.mix?.session;
+    const segment = currentMixSegment();
+    const entry = qcCatalog.find(item => item.id === segment?.entryId);
+    if (!session || !segment || !entry) return;
+    const total = Math.max(0, Number($('#mix-total').value || 0));
+    const correct = Math.max(0, Number($('#mix-correct').value || 0));
+    const wrong = Math.max(0, Number($('#mix-wrong').value || 0));
+    const blank = Math.max(0, Number($('#mix-blank').value || 0));
+    const minutes = Math.max(1, Number($('#mix-minutes').value || 1));
+    if (correct + wrong + blank > total) return toast('Acertos + erros + brancos não podem superar o total.');
+    segment.result = { total, correct, wrong, blank, minutes };
+    segment.status = 'done';
+
+    const topic = matchTopicForCatalog(entry);
+    if (topic) {
+      const old = getTopicStat(topic.id);
+      const answered = correct + wrong;
+      const accuracy = answered ? correct / answered : 0;
+      const next = new Date(); next.setDate(next.getDate() + (accuracy < .5 ? 1 : accuracy < .7 ? 2 : accuracy < .85 ? 4 : 7));
+      state.topicStats[topic.id] = {
+        ...old,
+        total: Number(old.total || 0) + total,
+        correct: Number(old.correct || 0) + correct,
+        wrong: Number(old.wrong || 0) + wrong,
+        blank: Number(old.blank || 0) + blank,
+        minutes: Number(old.minutes || 0) + minutes,
+        sessions: Number(old.sessions || 0) + 1,
+        status: 'em-revisao', lastStudiedAt: nowIso(), nextReviewAt: next.toISOString()
+      };
+    }
+    state.sessions.push({ id: uid(), topicId: topic?.id || entry.id, topicLabel: entry.label, block: entry.block, total, correct, wrong, blank, minutes, completedAt: nowIso(), source: 'qconcursos-mobile-mix', mixSessionId: session.id });
+    session.current += 1;
+    saveState(); closeModal(); renderAll();
+  }
+
+  function finishMixSession() {
+    state.mix.session = null;
+    saveState(); renderMix(); toast('Sessão misturada concluída e registrada.');
+  }
+
+  function cancelMixSession() {
+    if (!confirm('Cancelar a sessão misturada atual? Os blocos já registrados serão mantidos.')) return;
+    state.mix.session = null; saveState(); renderMix();
+  }
+
+  function renderMixRunner() {
+    const runner = $('#mix-runner');
+    const builder = $('#mix-builder');
+    if (!runner || !builder) return;
+    const session = state.mix?.session;
+    if (!session) {
+      runner.classList.add('hidden'); builder.classList.remove('hidden'); return;
+    }
+    runner.classList.remove('hidden'); builder.classList.add('hidden');
+    if (session.current >= session.segments.length) {
+      const totals = session.segments.reduce((acc, segment) => {
+        const r = segment.result || {}; acc.total += Number(r.total||0); acc.correct += Number(r.correct||0); acc.wrong += Number(r.wrong||0); return acc;
+      }, {total:0,correct:0,wrong:0});
+      runner.innerHTML = `<div class="mix-finish"><span class="eyebrow">SESSÃO CONCLUÍDA</span><h2>${totals.total} questões registradas</h2><p>${totals.correct} acertos · ${totals.wrong} erros</p><button id="finish-mix-session" class="btn primary full">Finalizar sessão</button></div>`;
+      $('#finish-mix-session').onclick = finishMixSession;
+      return;
+    }
+    const segment = currentMixSegment();
+    const entry = qcCatalog.find(item => item.id === segment.entryId);
+    runner.innerHTML = `
+      <div class="mix-progress"><span>Filtro ${session.current + 1} de ${session.segments.length}</span><strong>${session.segments.filter(s=>s.status==='done').length}/${session.segments.length}</strong></div>
+      <article class="mix-current-card">
+        <span class="badge">${escapeHtml(entry.block)}</span>
+        <h2>${escapeHtml(entry.label)}</h2>
+        <p>Resolva aproximadamente <strong>${segment.expected} questões</strong>. Depois volte para registrar e abrir o próximo filtro.</p>
+        <div class="mix-route-status"><span>${entry.quality === 'exact' ? 'Rota exata catalogada' : 'Busca curta catalogada'}</span></div>
+        <div class="mix-run-actions">
+          <button id="open-mix-segment" class="btn primary">${segment.status === 'opened' ? 'Abrir novamente' : 'Abrir CEBRASPE'}</button>
+          <button id="register-mix-segment" class="btn secondary" ${segment.status !== 'opened' ? 'disabled' : ''}>Registrar bloco</button>
+        </div>
+        <button id="open-mix-broad" class="mission-broad-link">Abrir este assunto sem restringir a banca</button>
+      </article>
+      <div class="mix-queue">${session.segments.map((item,index) => { const e=qcCatalog.find(x=>x.id===item.entryId); return `<div class="mix-queue-item ${index===session.current?'active':''} ${item.status}"><span>${index+1}</span><div><strong>${escapeHtml(e?.label||item.entryId)}</strong><small>${item.expected} questões</small></div></div>`; }).join('')}</div>
+      <button id="cancel-mix" class="danger-link">Cancelar sessão atual</button>`;
+    $('#open-mix-segment').onclick = openCurrentMixSegment;
+    $('#open-mix-broad').onclick = () => window.open(buildCatalogUrl(entry, 'broad'), '_blank', 'noopener');
+    $('#register-mix-segment').onclick = openMixResultForm;
+    $('#cancel-mix').onclick = cancelMixSession;
+  }
+
+  function renderMix() {
+    if (!$('#mix-catalog')) return;
+    const entries = selectedMixEntries();
+    $('#mix-selected-count').textContent = String(entries.length);
+    $('#start-mix').disabled = entries.length < 2;
+    renderMixCatalog();
+    renderMixRunner();
+  }
+
   function openRouteEditor(topic) {
     const existingRoute = state.routes[topic.id] || {};
     const existingUrl = existingRoute.url || '';
     const automaticKeyword = compactQcSearchTerm(topic);
     const existingKeyword = existingRoute.keyword || automaticKeyword;
     openModal(`
-      <h2 class="modal-title">Busca no QConcursos</h2>
-      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>A busca automática agora usa somente uma palavra-chave curta. Você pode ajustá-la sem precisar salvar uma URL completa.</p>
+      <h2 class="modal-title">Substituição manual</h2>
+      <p class="modal-subtitle"><strong>${escapeHtml(topic.label)}</strong><br>O catálogo automático já será usado. Preencha somente quando desejar substituir a rota por um filtro específico da sua conta.</p>
       <div class="route-editor">
         <label class="form-field">Palavra-chave<input id="route-keyword" type="text" maxlength="80" placeholder="Ex.: COBIT 19 e ISO/IEC 38500" value="${escapeHtml(existingKeyword)}"></label>
-        <small class="route-help">Evite copiar o título inteiro do edital. Use somente a norma, tecnologia ou conceito principal.</small>
+        <small class="route-help">A palavra-chave é apenas um fallback. Prefira deixar vazio e usar o catálogo automático.</small>
         <label class="form-field" style="margin-top:12px">URL de filtro salvo (opcional)<input id="route-url" type="url" placeholder="https://www.qconcursos.com/..." value="${escapeHtml(existingUrl)}"></label>
         <button id="test-fallback" class="btn secondary full" style="margin-top:10px">Testar esta palavra-chave</button>
       </div>
@@ -707,6 +991,7 @@
     $$('.bottom-nav button').forEach(button => button.classList.toggle('active', button.dataset.target === target));
     window.scrollTo({top:0,behavior:'smooth'});
     if (target === 'plan') renderPlan();
+    if (target === 'mix') renderMix();
     if (target === 'syllabus') renderSyllabus();
     if (target === 'data') renderStats();
   }
@@ -776,6 +1061,11 @@
     });
     $('#save-settings').onclick = saveSettings;
     $('#manage-routes').onclick = openRoutesManager;
+    $('#mix-search').oninput = renderMix;
+    $('#mix-clear').onclick = () => { state.mix.selected = []; saveState(); renderMix(); };
+    $('#start-mix').onclick = startMixSession;
+    $('#mix-question-count').onchange = saveState;
+    $('#mix-strategy').onchange = saveState;
     $('#export-data').onclick = exportData;
     $('#import-data').onchange = event => { const file=event.target.files?.[0]; if(file) importData(file); event.target.value=''; };
     $('#reset-data').onclick = resetData;
@@ -792,7 +1082,7 @@
   }
 
   function renderAll() {
-    renderCountdown(); renderMission(); renderPendingSession(); renderTodaySummary(); renderPlan(); renderSyllabus(); renderStats();
+    renderCountdown(); renderMission(); renderPendingSession(); renderTodaySummary(); renderPlan(); renderMix(); renderSyllabus(); renderStats();
     $$('#time-options button').forEach(button => button.classList.toggle('selected', Number(button.dataset.minutes) === Number(state.settings.selectedMinutes)));
   }
 
