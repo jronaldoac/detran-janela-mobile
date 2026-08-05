@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '0.3.0';
+  const APP_VERSION = '0.4.0';
   const STORAGE_KEY = 'detran_janela_mobile_v1';
   const rawData = window.DETRAN_MOBILE_DATA || { edital: [], config: {} };
   const qcCatalog = Array.isArray(window.QC_ROUTE_CATALOG) ? window.QC_ROUTE_CATALOG : [];

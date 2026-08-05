@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#07111f">
+  <meta name="theme-color" content="#f5f7fb">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="DETRAN Janela">
   <title>DETRAN Janela</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="assets/app.css?v=0.3.0">
+  <link rel="stylesheet" href="assets/app.css?v=0.4.0">
 </head>
 <body>
   <div id="app-shell">
@@ -20,10 +20,13 @@
         <div class="brand-mark">DJ</div>
         <div>
           <strong>DETRAN Janela</strong>
-          <span>Abra e estude. Sem meta artificial.</span>
+          <span>Estudo direto para qualquer janela livre.</span>
         </div>
       </div>
-      <button id="install-btn" class="icon-btn hidden" aria-label="Instalar aplicativo" title="Instalar aplicativo">⇩</button>
+      <div class="topbar-actions">
+        <a class="header-tool-btn" href="vazao.html" aria-label="Abrir conversor de vazão" title="Conversor de vazão">💧</a>
+        <button id="install-btn" class="icon-btn hidden" aria-label="Instalar aplicativo" title="Instalar aplicativo">⇩</button>
+      </div>
     </header>
 
     <main>
@@ -32,6 +35,13 @@
           <div><span>PROVA DETRAN-AL</span><strong id="days-left">—</strong><small>dias</small></div>
           <div class="countdown-meta"><b>20 set 2026</b><span>Análise de Sistemas · CEBRASPE</span></div>
         </div>
+
+
+        <a class="flow-tool-banner" href="vazao.html">
+          <span class="flow-tool-icon">💧</span>
+          <span class="flow-tool-copy"><strong>Conversor de vazão</strong><small>Meça o tempo e converta mL/s para L/h.</small></span>
+          <span class="flow-tool-arrow">›</span>
+        </a>
 
         <div class="section-heading practical-heading">
           <div><span class="eyebrow">ESTUDAR AGORA</span><h1>Sua próxima prioridade</h1></div>
@@ -141,7 +151,7 @@
           <button id="reset-data" class="danger-link">Apagar dados deste celular</button>
         </div>
 
-        <div class="version-note">DETRAN Janela v0.3.0 · modo prático</div>
+        <div class="version-note">DETRAN Janela v0.4.0 · interface clara</div>
       </section>
     </main>
 
@@ -159,8 +169,8 @@
   </div>
   <div id="toast" class="toast hidden"></div>
 
-  <script src="data/edital.js?v=0.3.0"></script>
-  <script src="data/qc-catalog.js?v=0.3.0"></script>
-  <script src="assets/app.js?v=0.3.0"></script>
+  <script src="data/edital.js?v=0.4.0"></script>
+  <script src="data/qc-catalog.js?v=0.4.0"></script>
+  <script src="assets/app.js?v=0.4.0"></script>
 </body>
 </html>

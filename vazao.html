@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Conversor de Vazão</title>
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="assets/app.css?v=0.4.0">
+</head>
+<body class="tool-page">
+  <header class="tool-header">
+    <a class="back-link" href="index.html" aria-label="Voltar ao DETRAN Janela">‹</a>
+    <div class="tool-header-copy">
+      <strong>Conversor de vazão</strong>
+      <span>Ferramenta provisória de campo</span>
+    </div>
+  </header>
+
+  <main class="tool-shell">
+    <section class="tool-intro">
+      <span class="eyebrow">MEDIÇÃO RÁPIDA</span>
+      <h1>De mL e segundos para L/h</h1>
+      <p>Colete um volume conhecido, cronometre o tempo e use o botão <strong>Inserir</strong> para levar os segundos diretamente ao cálculo.</p>
+    </section>
+
+    <section class="stopwatch-card" aria-labelledby="stopwatch-title">
+      <span id="stopwatch-title" class="stopwatch-label">Cronômetro</span>
+      <div id="stopwatch-display" class="stopwatch-display" aria-live="polite">00:00.00</div>
+      <p id="stopwatch-status" class="stopwatch-status">Pronto para iniciar.</p>
+      <div class="stopwatch-actions">
+        <button id="start-stopwatch" class="start" type="button">Iniciar</button>
+        <button id="pause-stopwatch" class="pause" type="button">Pausar</button>
+        <button id="reset-stopwatch" class="reset" type="button">Resetar</button>
+        <button id="insert-stopwatch" class="insert" type="button">Inserir</button>
+      </div>
+    </section>
+
+    <section class="calculator-card" aria-labelledby="calculator-title">
+      <span id="calculator-title" class="calculator-label">Dados da coleta</span>
+      <div class="measurement-grid">
+        <label class="measurement-field">
+          Volume coletado
+          <span class="measurement-input-wrap">
+            <input id="volume-ml" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 500" aria-label="Volume coletado em mililitros">
+            <span>mL</span>
+          </span>
+        </label>
+        <label class="measurement-field">
+          Tempo medido
+          <span class="measurement-input-wrap">
+            <input id="elapsed-seconds" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 18,4" aria-label="Tempo medido em segundos">
+            <span>s</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="flow-result" aria-live="polite">
+        <span>Vazão calculada</span>
+        <strong id="flow-lh">— L/h</strong>
+        <small id="flow-mls">Informe volume e tempo válidos.</small>
+      </div>
+      <button id="clear-calculator" class="tool-clear" type="button">Limpar campos</button>
+    </section>
+
+    <section class="formula-card">
+      <strong>Fórmula aplicada</strong>
+      <code>L/h = (mL ÷ segundos) × 3,6</code>
+      <p>Exemplo: 500 mL coletados em 18 segundos correspondem a 100 L/h.</p>
+    </section>
+  </main>
+
+  <script src="assets/vazao.js?v=0.4.0"></script>
+</body>
+</html>
