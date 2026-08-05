@@ -1,7 +1,7 @@
 {
-  "name": "DETRAN Janela — Missões CEBRASPE",
+  "name": "DETRAN Janela — Estudo livre CEBRASPE",
   "short_name": "DETRAN Janela",
-  "description": "Roteador móvel de estudos para o DETRAN-AL 2026, integrado por links ao QConcursos.",
+  "description": "Aplicativo móvel para abrir prioridades do edital e estudar em qualquer janela de tempo, sem metas artificiais.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
