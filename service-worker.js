@@ -1,9 +1,9 @@
-const CACHE = 'detran-janela-v0.4.0';
+const CACHE = 'detran-janela-v0.4.1';
 const FILES = [
   './', './index.html', './vazao.html', './manifest.webmanifest',
-  './assets/app.css?v=0.4.0', './assets/app.js?v=0.4.0', './assets/vazao.js?v=0.4.0',
+  './assets/app.css?v=0.4.1', './assets/app.js?v=0.4.1', './assets/vazao.js?v=0.4.1',
   './assets/icon-192.png', './assets/icon-512.png',
-  './data/edital.js?v=0.4.0', './data/qc-catalog.js?v=0.4.0'
+  './data/edital.js?v=0.4.1', './data/qc-catalog.js?v=0.4.1'
 ];
 
 self.addEventListener('install', event => {

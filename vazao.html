@@ -8,22 +8,38 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Conversor de Vazão</title>
   <link rel="icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="assets/app.css?v=0.4.0">
+  <link rel="stylesheet" href="assets/app.css?v=0.4.1">
 </head>
 <body class="tool-page">
   <header class="tool-header">
     <a class="back-link" href="index.html" aria-label="Voltar ao DETRAN Janela">‹</a>
     <div class="tool-header-copy">
       <strong>Conversor de vazão</strong>
-      <span>Ferramenta provisória de campo</span>
+      <span>Medições de B1, B2, B3 e T1</span>
     </div>
   </header>
 
   <main class="tool-shell">
     <section class="tool-intro">
-      <span class="eyebrow">MEDIÇÃO RÁPIDA</span>
-      <h1>De mL e segundos para L/h</h1>
-      <p>Colete um volume conhecido, cronometre o tempo e use o botão <strong>Inserir</strong> para levar os segundos diretamente ao cálculo.</p>
+      <span class="eyebrow">MEDIÇÃO DE CAMPO</span>
+      <h1>Registrar e comparar vazões</h1>
+      <p>Selecione o ponto, cronometre a coleta e salve. Cada ponto mantém sua própria lista e sua média atualizada.</p>
+    </section>
+
+    <section class="measurement-point-card" aria-labelledby="point-title">
+      <div class="point-card-header">
+        <div>
+          <span id="point-title" class="calculator-label">Destino da medição</span>
+          <strong id="selected-point-title">Salvar próxima vazão em B1</strong>
+        </div>
+        <span id="selected-point-count" class="point-count">0 medições</span>
+      </div>
+      <div class="point-selector" role="radiogroup" aria-label="Selecionar ponto da medição">
+        <button class="point-option active" type="button" data-point="B1" role="radio" aria-checked="true">B1</button>
+        <button class="point-option" type="button" data-point="B2" role="radio" aria-checked="false">B2</button>
+        <button class="point-option" type="button" data-point="B3" role="radio" aria-checked="false">B3</button>
+        <button class="point-option" type="button" data-point="T1" role="radio" aria-checked="false">T1</button>
+      </div>
     </section>
 
     <section class="stopwatch-card" aria-labelledby="stopwatch-title">
@@ -62,16 +78,33 @@
         <strong id="flow-lh">— L/h</strong>
         <small id="flow-mls">Informe volume e tempo válidos.</small>
       </div>
+
+      <button id="save-flow" class="save-flow-button" type="button" disabled>
+        <span>Salvar medição em B1</span>
+        <small>A lista e a média serão atualizadas</small>
+      </button>
+      <p id="save-feedback" class="save-feedback" aria-live="polite"></p>
       <button id="clear-calculator" class="tool-clear" type="button">Limpar campos</button>
+    </section>
+
+    <section class="flow-history-card" aria-labelledby="history-title">
+      <div class="flow-history-header">
+        <div>
+          <span class="calculator-label">Histórico salvo</span>
+          <h2 id="history-title">Médias por ponto</h2>
+        </div>
+        <button id="clear-all-flows" class="clear-all-flows" type="button">Limpar tudo</button>
+      </div>
+      <div id="flow-history-list" class="flow-history-list"></div>
     </section>
 
     <section class="formula-card">
       <strong>Fórmula aplicada</strong>
       <code>L/h = (mL ÷ segundos) × 3,6</code>
-      <p>Exemplo: 500 mL coletados em 18 segundos correspondem a 100 L/h.</p>
+      <p>A média de cada ponto é calculada pela soma das vazões salvas dividida pela quantidade de medições.</p>
     </section>
   </main>
 
-  <script src="assets/vazao.js?v=0.4.0"></script>
+  <script src="assets/vazao.js?v=0.4.1"></script>
 </body>
 </html>
