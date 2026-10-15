@@ -9,7 +9,7 @@ import struct
 XIP_MIN = 0x10000000
 XIP_MAX = 0x11000000
 BLOCK = 4096
-VERSION = re.compile(rb"(?:[Vv]ersion|[Ff]irmware|[Vv])[\\s:=_-]{0,8}([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}(?:[-.][0-9]{1,3})?)")
+VERSION = re.compile(rb"(?:[Vv]ersion|[Ff]irmware|[Vv])[\s:=_-]{0,8}([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?:[-.][0-9]{1,3})?)")
 
 class FormatError(ValueError):
     pass
@@ -37,7 +37,7 @@ def scan_bin(data: bytes) -> dict:
     }
 
 def scan_elf(data: bytes) -> dict:
-    if len(data) < 52 or data[:4] != b"\\x7fELF" or data[4:6] != b"\\x01\\x01":
+    if len(data) < 52 or data[:4] != b"\x7fELF" or data[4:6] != b"\x01\x01":
         raise FormatError("ELF32 little-endian inválido ou incompatível")
     values = struct.unpack_from("<HHIIIIIHHHHHH", data, 16)
     machine, entry, phoff, phentsize, phnum = values[1], values[3], values[4], values[9], values[10]
@@ -64,6 +64,6 @@ def scan_elf(data: bytes) -> dict:
 def inspect(path: str | Path) -> dict:
     p = Path(path)
     data = p.read_bytes()
-    result = scan_elf(data) if data.startswith(b"\\x7fELF") else scan_bin(data)
+    result = scan_elf(data) if data.startswith(b"\x7fELF") else scan_bin(data)
     result["file"] = p.name
     return result

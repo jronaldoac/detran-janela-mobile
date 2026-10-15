@@ -15,7 +15,7 @@ from hs_recovery.readings import ArchiveError, load_archive, parse_records, expo
 
 class FirmwareTests(unittest.TestCase):
     def test_littlefs_pair_and_no_map_promise(self):
-        b = bytearray(b"\\xff" * (4096 * 4))
+        b = bytearray(b"\xff" * (4096 * 4))
         b[4096 + 8:4096 + 16] = b"littlefs"
         b[8192 + 8:8192 + 16] = b"littlefs"
         x = scan_bin(bytes(b))
@@ -23,13 +23,13 @@ class FirmwareTests(unittest.TestCase):
         self.assertFalse(x["partition_map_verified"])
 
     def test_lone_string_is_not_proof(self):
-        b = bytearray(b"\\xff" * (4096 * 4))
+        b = bytearray(b"\xff" * (4096 * 4))
         b[4096 + 8:4096 + 16] = b"littlefs"
         self.assertEqual(scan_bin(bytes(b))["littlefs_candidates"], [])
 
     def test_elf_segment_not_partition(self):
         b = bytearray(200)
-        b[:16] = b"\\x7fELF" + bytes([1, 1, 1]) + bytes(9)
+        b[:16] = b"\x7fELF" + bytes([1, 1, 1]) + bytes(9)
         struct.pack_into("<HHIIIIIHHHHHH", b, 16, 2, 40, 1, 0x1000A000, 52, 0, 0, 52, 32, 1, 40, 0, 0)
         struct.pack_into("<IIIIIIII", b, 52, 1, 128, 0x1000A000, 0x1000A000, 16, 16, 5, 256)
         x = scan_elf(bytes(b))
@@ -38,7 +38,7 @@ class FirmwareTests(unittest.TestCase):
 
     def test_bad_elf_rejected(self):
         with self.assertRaises(FormatError):
-            scan_elf(b"\\x7fELF")
+            scan_elf(b"\x7fELF")
 
     def test_inspection_does_not_change_file(self):
         with tempfile.TemporaryDirectory() as td:
@@ -82,11 +82,11 @@ class BackupTests(unittest.TestCase):
 
     def test_partial_record_rejected(self):
         with self.assertRaises(ArchiveError):
-            parse_records("backup/1", b"\\x00"*9)
+            parse_records("backup/1", b"\x00"*9)
 
     def test_path_traversal_rejected(self):
         with self.assertRaises(ArchiveError):
-            parse_records("backup/../../settings", b"\\x00"*10)
+            parse_records("backup/../../settings", b"\x00"*10)
 
 if __name__ == "__main__":
     unittest.main()

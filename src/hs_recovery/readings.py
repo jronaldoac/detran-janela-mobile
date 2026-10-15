@@ -9,7 +9,7 @@ import struct
 import zipfile
 
 RECORD = struct.Struct("<iBBI")  # 10 bytes; interpretação ainda dependente da revisão
-NAME = re.compile(r"backup/(0|[1-9][0-9]{0,2})\\Z")
+NAME = re.compile(r"backup/(0|[1-9][0-9]{0,2})\Z")
 MAX_ITEM = 1_048_576
 MAX_TOTAL = 16_777_216
 
